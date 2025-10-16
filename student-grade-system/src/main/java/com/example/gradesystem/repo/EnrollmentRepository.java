@@ -17,12 +17,27 @@ public class EnrollmentRepository extends BaseTsvRepository<Enrollment> {
         return loadAll().stream().filter(e -> e.getStudentId().equals(studentId)).collect(Collectors.toList());
     }
 
+    public List<Enrollment> findByStudentIdAndTerm(String studentId, String term) {
+        String t = term == null ? "" : term;
+        return loadAll().stream().filter(e -> e.getStudentId().equals(studentId) && e.getTerm().equals(t)).collect(Collectors.toList());
+    }
+
     public List<Enrollment> findByCourseId(String courseId) {
         return loadAll().stream().filter(e -> e.getCourseId().equals(courseId)).collect(Collectors.toList());
     }
 
+    public List<Enrollment> findByCourseIdAndTerm(String courseId, String term) {
+        String t = term == null ? "" : term;
+        return loadAll().stream().filter(e -> e.getCourseId().equals(courseId) && e.getTerm().equals(t)).collect(Collectors.toList());
+    }
+
     public Optional<Enrollment> find(String studentId, String courseId) {
         return loadAll().stream().filter(e -> e.getStudentId().equals(studentId) && e.getCourseId().equals(courseId)).findFirst();
+    }
+
+    public Optional<Enrollment> find(String studentId, String courseId, String term) {
+        String t = term == null ? "" : term;
+        return loadAll().stream().filter(e -> e.getStudentId().equals(studentId) && e.getCourseId().equals(courseId) && e.getTerm().equals(t)).findFirst();
     }
 
     public void save(Enrollment enrollment) {
@@ -34,12 +49,19 @@ public class EnrollmentRepository extends BaseTsvRepository<Enrollment> {
 
     @Override protected Enrollment parse(String line) {
         String[] p = line.split("\t", -1);
-        Double grade = p[2].isBlank() ? null : Double.parseDouble(p[2]);
-        return new Enrollment(p[0], p[1], grade);
+        // Backward compatible: 3 columns -> studentId, courseId, grade; 4th optional is term
+        Double grade = p.length >= 3 && p[2].isBlank() ? null : (p.length >= 3 ? tryParseDouble(p[2]) : null);
+        String term = p.length >= 4 ? p[3] : "";
+        return new Enrollment(p[0], p[1], grade, term);
     }
 
     @Override protected String serialize(Enrollment item) {
         String g = item.getGrade() == null ? "" : Double.toString(item.getGrade());
-        return item.getStudentId() + "\t" + item.getCourseId() + "\t" + g;
+        String t = item.getTerm() == null ? "" : item.getTerm();
+        return item.getStudentId() + "\t" + item.getCourseId() + "\t" + g + "\t" + t;
+    }
+
+    private static Double tryParseDouble(String s) {
+        try { return Double.parseDouble(s); } catch (Exception e) { return null; }
     }
 }

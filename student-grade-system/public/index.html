@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>学生成绩 Dashboard</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Liberation Sans", "Apple Color Emoji", "Segoe UI Emoji"; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { background: #111827; padding: 16px 24px; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #1f2937; }
+    h1 { margin: 0; font-size: 20px; }
+    main { padding: 24px; display: grid; gap: 24px; grid-template-columns: 1fr; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; }
+    .row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; }
+    .col-6 { grid-column: span 6; }
+    .col-4 { grid-column: span 4; }
+    .col-12 { grid-column: span 12; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #1f2937; }
+    th { color: #93c5fd; }
+    input, select, button { background: #0b1220; color: #e2e8f0; border: 1px solid #1f2937; border-radius: 8px; padding: 8px 10px; }
+    button { cursor: pointer; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .muted { color: #94a3b8; }
+    .pill { padding: 2px 8px; border-radius: 999px; background: #1d4ed8; font-size: 12px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>学生成绩 Dashboard</h1>
+</header>
+<main>
+  <section class="row">
+    <div class="card col-4">
+      <h3>新建学生</h3>
+      <div class="grid">
+        <input id="studentName" placeholder="姓名" />
+        <button onclick="addStudent()">添加</button>
+      </div>
+    </div>
+    <div class="card col-4">
+      <h3>新建课程</h3>
+      <div class="grid">
+        <input id="courseName" placeholder="课程名" />
+        <input id="courseCredits" placeholder="学分" type="number" min="1" />
+        <button onclick="addCourse()">添加</button>
+      </div>
+    </div>
+    <div class="card col-4">
+      <h3>选课/打分</h3>
+      <div class="grid">
+        <input id="enrollSid" placeholder="学生ID" />
+        <input id="enrollCid" placeholder="课程ID" />
+        <input id="enrollTerm" placeholder="学期(如 2025-Fall)" />
+        <button onclick="enroll()">选课</button>
+        <input id="gradeValue" placeholder="成绩(0-100)" type="number" />
+        <button onclick="grade()">打分</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="row">
+    <div class="card col-6">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <h3>学生列表</h3>
+        <input id="studentSearch" placeholder="搜索学生" oninput="reloadStudents()" />
+      </div>
+      <table id="studentsTable"><thead><tr><th>ID</th><th>姓名</th><th>GPA(全部)</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card col-6">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <h3>课程列表</h3>
+        <input id="courseSearch" placeholder="搜索课程" oninput="reloadCourses()" />
+      </div>
+      <table id="coursesTable"><thead><tr><th>ID</th><th>课程</th><th>学分</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <section class="row">
+    <div class="card col-6">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <h3>GPA 排行</h3>
+        <div>
+          <input id="lbTerm" placeholder="学期(可空)" />
+          <button onclick="reloadLeaderboard()">刷新</button>
+        </div>
+      </div>
+      <table id="leaderboard"><thead><tr><th>学生</th><th>GPA</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card col-6">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <h3>课程难度(平均分)</h3>
+        <div>
+          <input id="cdTerm" placeholder="学期(可空)" />
+          <button onclick="reloadCourseDiff()">刷新</button>
+        </div>
+      </div>
+      <table id="courseDiff"><thead><tr><th>课程</th><th>平均分</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+</main>
+<script>
+async function addStudent(){
+  const name = document.getElementById('studentName').value.trim();
+  if(!name) return;
+  await fetch('/api/students', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({name})});
+  document.getElementById('studentName').value='';
+  reloadStudents(); reloadLeaderboard();
+}
+async function addCourse(){
+  const name = document.getElementById('courseName').value.trim();
+  const credits = document.getElementById('courseCredits').value.trim();
+  if(!name||!credits) return;
+  await fetch('/api/courses', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({name,credits})});
+  document.getElementById('courseName').value='';
+  document.getElementById('courseCredits').value='';
+  reloadCourses();
+}
+async function enroll(){
+  const studentId = document.getElementById('enrollSid').value.trim();
+  const courseId = document.getElementById('enrollCid').value.trim();
+  const term = document.getElementById('enrollTerm').value.trim();
+  if(!studentId||!courseId) return;
+  await fetch('/api/enroll', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({studentId,courseId,term})});
+  reloadLeaderboard(); reloadCourseDiff();
+}
+async function grade(){
+  const studentId = document.getElementById('enrollSid').value.trim();
+  const courseId = document.getElementById('enrollCid').value.trim();
+  const term = document.getElementById('enrollTerm').value.trim();
+  const grade = document.getElementById('gradeValue').value.trim();
+  if(!studentId||!courseId||!grade) return;
+  await fetch('/api/grade', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({studentId,courseId,term,grade})});
+  reloadLeaderboard(); reloadCourseDiff();
+}
+
+async function reloadStudents(){
+  const q = document.getElementById('studentSearch').value.trim();
+  const url = q ? '/api/search/students?q='+encodeURIComponent(q) : '/api/students';
+  const data = await (await fetch(url)).json();
+  const tbody = document.querySelector('#studentsTable tbody');
+  tbody.innerHTML='';
+  for(const s of data){
+    const gpaData = await (await fetch(`/api/students/${encodeURIComponent(s.id)}/gpa`)).json().catch(()=>null);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="muted">${s.id}</td><td>${s.name}</td><td>${gpaData && gpaData.gpa ? Number(gpaData.gpa).toFixed(2):'0.00'}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function reloadCourses(){
+  const q = document.getElementById('courseSearch').value.trim();
+  const url = q ? '/api/search/courses?q='+encodeURIComponent(q) : '/api/courses';
+  const data = await (await fetch(url)).json();
+  const tbody = document.querySelector('#coursesTable tbody');
+  tbody.innerHTML='';
+  for(const c of data){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="muted">${c.id}</td><td>${c.name}</td><td><span class="pill">${c.credits}</span></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function reloadLeaderboard(){
+  const term = document.getElementById('lbTerm').value.trim();
+  const url = term ? `/api/analytics/leaderboard?term=${encodeURIComponent(term)}` : '/api/analytics/leaderboard';
+  const data = await (await fetch(url)).json();
+  const tbody = document.querySelector('#leaderboard tbody');
+  tbody.innerHTML='';
+  for(const r of data){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.student.name} <span class="muted">(${r.student.id})</span></td><td>${Number(r.gpa).toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function reloadCourseDiff(){
+  const term = document.getElementById('cdTerm').value.trim();
+  const url = term ? `/api/analytics/course-difficulty?term=${encodeURIComponent(term)}` : '/api/analytics/course-difficulty';
+  const data = await (await fetch(url)).json();
+  const tbody = document.querySelector('#courseDiff tbody');
+  tbody.innerHTML='';
+  for(const r of data){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.course.name} <span class="muted">(${r.course.id})</span></td><td>${Number(r.average).toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+reloadStudents(); reloadCourses(); reloadLeaderboard(); reloadCourseDiff();
+</script>
+</body>
+</html>
